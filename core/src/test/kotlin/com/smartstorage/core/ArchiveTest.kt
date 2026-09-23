@@ -23,6 +23,19 @@ class ArchiveTest {
         assertEquals("transparent.png", restored.state.items.single().photo)
         assertArrayEquals(pixels, restored.photos["transparent.png"])
     }
+    @Test fun excelOmitsLegacyUnitColumnsAndValues() {
+        val state = sample().let { it.copy(items = it.items.map { item -> item.copy(unit = "旧计量单位") }) }
+        val bytes = ByteArrayOutputStream().also { ExcelExport.write(state, it) }.toByteArray()
+        val sheets = mutableListOf<String>()
+        ZipInputStream(bytes.inputStream()).use { zip -> while (true) {
+            val entry = zip.nextEntry ?: break
+            if (entry.name.startsWith("xl/worksheets/")) sheets += zip.readBytes().toString(Charsets.UTF_8)
+        } }
+        assertFalse(sheets.any { it.contains("旧计量单位") || it.contains(">单位<") })
+        assertTrue(sheets.any { it.contains("当前数量") })
+        val archive = ByteArrayOutputStream(); Archive.write(state, { byteArrayOf(1) }, archive)
+        assertEquals("旧计量单位", Archive.read(archive.toByteArray().inputStream()).state.items.single().unit)
+    }
     @Test fun encryptedBackupRequiresCorrectPassword() {
         val bytes = archive("correct")
         assertEquals(1, Archive.read(bytes.inputStream(), "correct".toCharArray()).state.items.size)

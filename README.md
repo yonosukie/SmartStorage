@@ -2,7 +2,9 @@
 
 Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文档](docs/Android-App设计文档.md)。v0.4.0 接入 OpenRouter 免费视觉模型，支持照片识别和自动填表；云备份仍预留接口。AI 识别会上传所选照片及分类选项，remove.bg 抠图会上传所选照片，其他库存资料保存在本机。
 
-本轮安装包：`artifacts/SmartStorage-0.4.0-debug.apk`。58 项测试通过，Lint 无问题；真实 API 与真机验收待配置 Key 后进行。
+本轮安装包：`artifacts/SmartStorage-0.5.0-debug.apk`。62 项测试通过，Lint 无问题；尚未进行本轮真机视觉验收。
+
+v0.5.0 将统计页全部改为图表，并移除计量单位的输入、展示和导出列，详见 [变更与验证记录](docs/统计图表与单位移除-v0.5.0.md)。
 
 OpenRouter 配置、免费模型限制和验收步骤见 [AI 识别说明](docs/OpenRouter-AI识别.md)。
 

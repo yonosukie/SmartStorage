@@ -28,7 +28,7 @@ import kotlinx.coroutines.CancellationException
     val old = s.items.firstOrNull { it.id == itemId }
     var name by rememberSaveable { mutableStateOf(old?.name ?: "") }
     var category by rememberSaveable { mutableStateOf(old?.category ?: "未分类") }
-    var unit by rememberSaveable { mutableStateOf(old?.unit ?: "件") }
+    val legacyUnit = old?.unit ?: "件"
     var notes by rememberSaveable { mutableStateOf(old?.notes ?: "") }
     var valuable by rememberSaveable { mutableStateOf(old?.valuable ?: false) }
     var photo by rememberSaveable { mutableStateOf(old?.photo) }
@@ -52,9 +52,9 @@ import kotlinx.coroutines.CancellationException
     var undoRecognition by remember { mutableStateOf<Pair<RecognitionDraft, RecognitionDraft>?>(null) }
     val recognitionScope = rememberCoroutineScope()
     val currentInventory by rememberUpdatedState(s)
-    fun draft() = RecognitionDraft(name, category, unit, notes, tags)
+    fun draft() = RecognitionDraft(name, category, legacyUnit, notes, tags)
     fun setDraft(value: RecognitionDraft) {
-        name = value.name; category = value.category; unit = value.unit; notes = value.notes; tags = value.tags
+        name = value.name; category = value.category; notes = value.notes; tags = value.tags
     }
     fun undoAi() {
         undoRecognition?.let { (before, applied) -> setDraft(draft().undo(before, applied, touched.toSet())) }
@@ -64,7 +64,7 @@ import kotlinx.coroutines.CancellationException
     fun applyRecognition(item: RecognizedItem) {
         undoAi()
         val before = draft()
-        val after = before.fill(item, currentInventory.labels, touched.toSet())
+        val after = before.fill(item, currentInventory.labels, touched.toSet() + "unit")
         setDraft(after)
         undoRecognition = if (before != after) before to after else null
         candidates = emptyList()
@@ -123,10 +123,10 @@ import kotlinx.coroutines.CancellationException
     BackHandler { if (busy) vm.notify("图片正在处理，请稍候") else exit = true }
     fun save(target: Thing? = old) {
         try {
-            require(name.isNotBlank() && unit.isNotBlank()) { "请填写物品名称和单位" }
+            require(name.isNotBlank()) { "请填写物品名称" }
             val count = quantity.toIntOrNull() ?: error("请输入整数数量")
             val item = if (target != null && mode != "edit") target else Thing(target?.id ?: newItemId,
-                name.trim(), category.trim().ifEmpty { "未分类" }, unit.trim(), tags, notes.trim(), valuable, photo,
+                name.trim(), category.trim().ifEmpty { "未分类" }, legacyUnit, tags, notes.trim(), valuable, photo,
                 target?.createdAt ?: System.currentTimeMillis(), target?.archived ?: false)
             val batch = if (mode == "edit") null else Batch(itemId = item.id, purchased = parseDate(purchased), expires = parseDate(expires), price = parsePrice(price))
             batch?.let { val bought = it.purchased; val expiry = it.expires
@@ -165,7 +165,6 @@ import kotlinx.coroutines.CancellationException
             FormSection("基本信息") {
             Field("物品名称 *", name, { name = it; touched = (touched + "name").distinct() })
             EditableChoice("分类", category, categories + s.items.map { it.category }) { category = it; touched = (touched + "category").distinct() }
-            EditableChoice("计量单位", unit, listOf("件", "个", "盒", "瓶", "包", "袋", "支", "套") + s.items.map { it.unit }) { unit = it; touched = (touched + "unit").distinct() }
             }
         } else SectionTitle(old?.name ?: "补充库存", "本次补货单独记录购买日期、单价和保质期。")
         if (mode != "edit") {
@@ -206,7 +205,7 @@ import kotlinx.coroutines.CancellationException
     )
     if (duplicate) AlertDialog({ duplicate = false }, title = { Text("发现同名物品") }, text = {
         Column { Text("可以新建独立物品，也可以为已有物品补货：")
-            s.items.filter { it.name.trim().equals(name.trim(), true) }.forEach { existing -> TextButton({ duplicate = false; save(existing) }) { Text("补货：${existing.name} · ${existing.unit}") } }
+            s.items.filter { it.name.trim().equals(name.trim(), true) }.forEach { existing -> TextButton({ duplicate = false; save(existing) }) { Text("补货：${existing.name}") } }
         }
     }, confirmButton = { TextButton({ duplicate = false; save() }) { Text("仍然新建") } }, dismissButton = { TextButton({ duplicate = false }) { Text("返回修改") } })
 }

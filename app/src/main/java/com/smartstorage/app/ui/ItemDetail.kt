@@ -25,7 +25,7 @@ import java.time.ZoneId
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle(item.name, "${item.category}${if (item.valuable) " · 贵重物品" else ""}") }
         item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Metric("${rows.sumOf { it.balance.quantity.toLong() }} ${item.unit}", "当前库存", Modifier.weight(1f))
+            Metric("${rows.sumOf { it.balance.quantity.toLong() }}", "当前库存", Modifier.weight(1f))
             Metric("¥${money(rows.sumOf { it.value })}", "已知成本", Modifier.weight(1f))
         } }
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -39,7 +39,7 @@ import java.time.ZoneId
         items(rows, key = { it.balance.id }) { row -> OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(s.path(row.balance.placeId), fontWeight = FontWeight.Bold)
-                Text("${row.balance.quantity} ${item.unit} · 单价 ${row.batch.price?.let { "¥${money(it)}" } ?: "未填写"}")
+                Text("${row.balance.quantity} · 单价 ${row.batch.price?.let { "¥${money(it)}" } ?: "未填写"}")
                 Text("购买：${row.batch.purchased ?: "未填写"}   到期：${row.batch.expires ?: "未设置"}", style = MaterialTheme.typography.bodySmall)
                 if (row.expired(today) && row.balance.quantity > 0) Text("已过期，请及时处理", color = MaterialTheme.colorScheme.error)
                 Row {
@@ -52,7 +52,7 @@ import java.time.ZoneId
         } }
         item { SectionTitle("库存记录") }
         items(s.movements.filter { op -> rows.any { it.batch.id == op.batchId } }.sortedByDescending { it.at }.take(100), key = { it.id }) { op ->
-            ListItem(headlineContent = { Text("${op.type} ${op.quantity} ${item.unit}${if(op.reason.isNotBlank()) " · ${op.reason}" else ""}") },
+            ListItem(headlineContent = { Text("${op.type} ${op.quantity}${if(op.reason.isNotBlank()) " · ${op.reason}" else ""}") },
                 supportingContent = { Text("${Instant.ofEpochMilli(op.at).atZone(ZoneId.systemDefault()).toLocalDateTime().toString().replace('T',' ')}\n${s.path(op.from)} → ${s.path(op.to)}") },
                 trailingContent = { if (op.type != "撤销" && s.movements.none { it.reversedId == op.id }) TextButton({ vm.update { InventoryRules.undo(it, op.id) } }, enabled = !busy) { Text("撤销") } })
         }
@@ -68,7 +68,7 @@ import java.time.ZoneId
     val operation = remember { newId() }; val busy by vm.busy.collectAsState()
     AlertDialog(dismiss, title = { Text("$type · ${row.item.name}") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("来源：${s.path(row.balance.placeId)}\n可用：${row.balance.quantity} ${row.item.unit}")
+            Text("来源：${s.path(row.balance.placeId)}\n可用：${row.balance.quantity}")
             if (initialType != "移动") Choice("操作", type, listOf("消耗", "丢弃", "盘点增加", "盘点减少").map { it to it }) { type = it }
             Field("数量", quantity, { quantity = it })
             if (type == "移动") PlaceChoice(s, target, { target = it })

@@ -43,7 +43,7 @@ import java.io.File
                     color = if(expired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                 else Text(thing.category, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("$quantity ${thing.unit}", fontWeight = FontWeight.Bold)
+            Text("数量 $quantity", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -92,7 +92,7 @@ import java.io.File
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Choice("分类", filter.category ?: "", listOf("" to "全部分类") + (categories + s.items.map { it.category }).distinct().map { it to it }) { filter = filter.copy(category = it.ifEmpty { null }) }
             PlaceChoice(s, filter.place ?: "", { filter = filter.copy(place = it.ifEmpty { null }) }, true, true)
-            Choice("有效期", filter.expiry, listOf("全部", "即将到期", "已过期", "未到期", "未设置").map { it to it }) { filter = filter.copy(expiry = it) }
+            Choice("有效期", filter.expiry, listOf("全部", "即将到期", "已过期", "未到期", "有效期内", "未设置").map { it to it }) { filter = filter.copy(expiry = it) }
             DateField("到期起始日期（可选）", from, { from = it }, maxDate = to); DateField("到期结束日期（可选）", to, { to = it }, minDate = from)
             Field("最低单价（元）", min, { min = it }); Field("最高单价（元）", max, { max = it })
             Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(filter.unknownPrice, { filter = filter.copy(unknownPrice = it) }); Text("仅未填写价格") }

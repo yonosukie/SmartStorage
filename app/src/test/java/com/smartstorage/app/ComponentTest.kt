@@ -56,6 +56,21 @@ class ComponentTest {
         compose.onNodeWithText("食品").performClick()
         compose.onNodeWithText("¥10.00").assertExists()
     }
+    @Test fun chartDetailsUseSelectedGroupAndExplicitCountLabel() {
+        var chosen = ""
+        compose.setContent { StorageTheme { DistributionChart("库存", listOf("食品" to 3L, "衣物" to 2L), countLabel = "", onDetails = { chosen = it }) } }
+        compose.onNodeWithText("食品").performClick()
+        compose.onNodeWithText("查看选中明细").performClick()
+        compose.runOnIdle { assertEquals("食品", chosen) }
+        compose.onNodeWithText("3").assertExists()
+        compose.onNodeWithText("3 个批次").assertDoesNotExist()
+    }
+    @Test fun oldItemUnitsAreNotDisplayedOnCards() {
+        val state = InventoryRules.add(Inventory(), Thing("i", "牛奶", unit = "瓶"), Batch("b", "i"), 3, UNPLACED, "add")
+        compose.setContent { StorageTheme { ItemCard(state, state.rows(), {}) } }
+        compose.onNodeWithText("数量 3").assertExists()
+        compose.onNodeWithText("3 瓶").assertDoesNotExist()
+    }
     @Test fun emptyChartDisplaysExplanation() {
         compose.setContent { StorageTheme { DistributionChart("价值分布", emptyList(), currency = true) } }
         compose.onNodeWithText("暂无已知价值数据，填写购入单价后显示图表。").assertExists()

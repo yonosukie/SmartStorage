@@ -13,6 +13,14 @@ class InventoryRulesTest {
         val s = Inventory(places = Inventory().places + listOf(home, room, box))
         return InventoryRules.add(s, thing, Batch("batch", thing.id, expires = expiry, price = 350), 6, room.id, "initial")
     }
+    @Test fun healthyExpiryFilterExcludesDueAndUnknownWithBatchOverrides() {
+        val today = LocalDate.of(2026, 9, 23)
+        var state = stock(today.plusDays(5).toString())
+        state = InventoryRules.add(state, thing, Batch("healthy", thing.id, expires = today.plusDays(20).toString()), 1, "room", "healthy")
+        state = InventoryRules.add(state, thing, Batch("override", thing.id, expires = today.plusDays(20).toString(), leadDays = 30), 1, "room", "override")
+        state = InventoryRules.add(state, thing, Batch("unknown", thing.id), 1, "room", "unknown")
+        assertEquals(listOf("healthy"), state.filtered(Filter(expiry = "有效期内"), today).map { it.batch.id })
+    }
     @Test fun partialMovePreservesBatchAndTotal() {
         val s = stock("2030-10-01"); val moved = InventoryRules.change(s, s.balances.first().id, 2, "移动", "box")
         assertEquals(6, moved.balances.sumOf { it.quantity }); assertEquals(4, moved.balances.first { it.placeId == "room" }.quantity)

@@ -83,6 +83,7 @@ fun Inventory.filtered(filter: Filter, today: LocalDate = LocalDate.now()): List
         (query.isEmpty() || listOf(r.item.name, r.item.notes, r.item.category, path(r.balance.placeId),
             r.item.tags.mapNotNull { labelMap[it] }.joinToString(" ")).any { it.lowercase().contains(query) }) &&
         (when (filter.expiry) { "已过期" -> r.expired(today); "即将到期" -> r.due(preferences.leadDays, today)
+            "有效期内" -> r.batch.expires != null && !r.expired(today) && !r.due(preferences.leadDays, today)
             "未到期" -> r.batch.expires != null && !r.expired(today); "未设置" -> r.batch.expires == null; else -> true }) &&
         (!filter.unknownPrice || r.batch.price == null) &&
         (filter.minPrice == null || (r.batch.price != null && r.batch.price >= filter.minPrice)) &&
