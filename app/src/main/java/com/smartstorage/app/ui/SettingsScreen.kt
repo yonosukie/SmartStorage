@@ -78,9 +78,10 @@ import java.time.LocalDate
         item { SectionTitle("Excel 清单", "导出物品汇总、批次与位置、库存流水和统计口径。")
             OutlinedButton({ excel.launch("SmartStorage-${LocalDate.now()}.xlsx") }, Modifier.fillMaxWidth(), enabled = !busy) { Text("导出全部 Excel 清单") }
         }
+        item { CutoutSettingsPanel(vm) }
         item { HorizontalDivider(); SectionTitle("联网能力")
             Text("AI 识别 · 待接入\n云备份 · 待接入")
-            Text("当前版本不上传物品资料或照片。", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
+            Text("开启自动抠图时仅将所选照片发送至 remove.bg，物品资料不会上传。", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 8.dp))
             SectionTitle("家有好物", "SmartStorage ${com.smartstorage.app.BuildConfig.VERSION_NAME} · 本地开发版")
         }
     }

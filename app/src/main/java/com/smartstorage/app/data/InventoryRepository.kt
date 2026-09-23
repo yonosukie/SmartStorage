@@ -25,6 +25,7 @@ class InventoryRepository(private val context: Context) {
     private val mutableState = MutableStateFlow<Inventory?>(null)
     val state = mutableState.asStateFlow()
     val photos = File(context.filesDir, "photos").apply { mkdirs() }
+    val cutoutSettings = CutoutSettings(context)
     val safetyBackup = File(context.filesDir, "restore-safety.ssb")
     fun close() = db.close()
     suspend fun load() = withContext(Dispatchers.IO) { mutex.withLock {
@@ -99,10 +100,17 @@ class InventoryRepository(private val context: Context) {
             ExifInterface.ORIENTATION_TRANSVERSE -> { postRotate(270f); postScale(-1f, 1f) }
         } }
         val bitmap = if (matrix.isIdentity) decoded else Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true).also { if (it !== decoded) decoded.recycle() }
-        val name = "${newId()}.jpg"
-        try { File(photos, name).outputStream().use { require(bitmap.compress(Bitmap.CompressFormat.JPEG, 86, it)) } }
+        val transparent = bitmap.hasAlpha()
+        val name = "${newId()}.${if (transparent) "png" else "jpg"}"
+        try { File(photos, name).outputStream().use { require(bitmap.compress(if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 86, it)) } }
         finally { bitmap.recycle() }
         name
+    }
+    suspend fun removeBackground(name: String): String = withContext(Dispatchers.IO) {
+        require(name.matches(Regex("[a-zA-Z0-9_-]+\\.(jpg|png)"))) { "图片路径无效" }
+        val bytes = RemoveBgClient().remove(File(photos, name), cutoutSettings.readKey())
+        val output = File(photos, "${newId()}.png")
+        try { output.writeBytes(bytes); output.name } catch (e: Exception) { output.delete(); throw e }
     }
     suspend fun export(uri: Uri, excel: Boolean, password: String, filter: Filter? = null) = withContext(Dispatchers.IO) { mutex.withLock {
         val snapshot = requireNotNull(mutableState.value)
@@ -124,7 +132,7 @@ class InventoryRepository(private val context: Context) {
         safetyTemp.outputStream().use { Archive.write(current, { File(photos, it).readBytes() }, it) }
         java.nio.file.Files.move(safetyTemp.toPath(), safetyBackup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         // New image names ensure a failed restore cannot overwrite images referenced by the old DB.
-        val names = archive.photos.keys.associateWith { "${newId()}.jpg" }
+        val names = archive.photos.keys.associateWith { "${newId()}.${it.substringAfterLast('.')}" }
         val written = mutableListOf<File>()
         try {
             archive.photos.forEach { (name, bytes) -> File(photos, names.getValue(name)).also { written.add(it); it.writeBytes(bytes) } }

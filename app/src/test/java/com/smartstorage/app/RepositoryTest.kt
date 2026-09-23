@@ -14,6 +14,22 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = android.app.Application::class)
 class RepositoryTest {
+    @Test fun restorePreservesPngExtensionAndBytes() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase("smart-storage.db")
+        val repo = InventoryRepository(context)
+        try {
+            repo.load()
+            val png = TestPng.bytes
+            val state = InventoryRules.add(Inventory(), Thing("cutout", "透明物品", photo = "cutout.png"),
+                Batch("batch", "cutout"), 1, UNPLACED, "import")
+            repo.restore(RestoredArchive(state, mapOf("cutout.png" to png)))
+            repo.load()
+            val name = repo.state.value!!.items.single().photo!!
+            assertTrue(name.endsWith(".png"))
+            assertArrayEquals(png, java.io.File(repo.photos, name).readBytes())
+        } finally { repo.close(); context.deleteDatabase("smart-storage.db") }
+    }
     @Test fun containerLayersSurviveDatabaseReopen() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.deleteDatabase("smart-storage.db")

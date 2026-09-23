@@ -32,6 +32,17 @@ import java.time.temporal.ChronoUnit
             Text(rows.groupBy { it.item.unit }.map { (unit, group) -> "${group.sumOf { it.balance.quantity.toLong() }} $unit" }.joinToString(" · ").ifEmpty { "暂无库存" }) }
         item { Chips(listOf("分类", "房间", "标签"), dimension) { dimension = it }
             if (dimension == "标签") Text("同一物品可有多个标签，各标签价值不可相加。", style = MaterialTheme.typography.bodySmall) }
+        item { DistributionChart("${dimension}价值分布", groups.map { it.key to it.value.sumOf { row -> row.value } }, currency = true, donut = dimension != "标签") }
+        item {
+            val activeBatches = rows.distinctBy { it.batch.id }
+            val status = activeBatches.groupBy { row -> when {
+                row.expired(today) -> "已过期"
+                row.batch.expires == null -> "未设置有效期"
+                row.due(s.preferences.leadDays, today) -> "即将到期"
+                else -> "有效期内"
+            } }
+            DistributionChart("库存有效期分布", status.map { it.key to it.value.size.toLong() })
+        }
         groups.entries.sortedByDescending { it.value.sumOf { row -> row.value } }.forEach { (name, group) -> item(key = "group-$name") {
             val amount = group.sumOf { it.value }; val total = rows.sumOf { it.value }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -51,6 +62,7 @@ import java.time.temporal.ChronoUnit
         item { SectionTitle("贵重物品"); Text("${valuable.map { it.item.id }.distinct().size} 种 · 已知成本 ¥${money(valuable.sumOf { it.value })}")
             TextButton({ onFilter(Filter(place = house.ifBlank { null }, valuable = true)) }) { Text("查看贵重物品") } }
         item { SectionTitle("拥有时间", "按当前仍在库的购买批次统计") }
+        item { DistributionChart("拥有时间分布", held.map { it.key to it.value.map { row -> row.batch.id }.distinct().size.toLong() }, donut = false) }
         held.forEach { (name, group) -> item(key = "held-$name") { Text("$name · ${group.map { it.batch.id }.distinct().size} 个批次 · ¥${money(group.sumOf { it.value })}") } }
         item { SectionTitle("过期物品"); Text("${expired.map { it.batch.id }.distinct().size} 个批次 · 已知成本 ¥${money(expired.sumOf { it.value })}")
             Text(expired.groupBy { it.item.unit }.map { (unit, group) -> "${group.sumOf { it.balance.quantity.toLong() }} $unit" }.joinToString(" · "))

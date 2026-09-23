@@ -59,6 +59,15 @@ class LayerAndGridTest {
         assertEquals(0f, large.x, 0f); assertEquals(1f, large.width, 0f)
         assertThrows(IllegalArgumentException::class.java) { LayoutGrid.snap(box.copy(x = Float.NaN)) }
     }
+    @Test fun rectangularResizeChangesAxesIndependently() {
+        val original = LayoutBox("box", "room", x = .7f, y = .6f, width = .2f, height = .2f)
+        val wide = LayoutGrid.resize(original, 6, 2)
+        assertEquals(.6f, wide.width, .00001f); assertEquals(original.height, wide.height, .00001f)
+        assertEquals(.4f, wide.x, .00001f); assertEquals(original.y, wide.y, .00001f)
+        val tall = LayoutGrid.resize(wide, 6, 8)
+        assertEquals(wide.width, tall.width, .00001f); assertEquals(.8f, tall.height, .00001f)
+        assertEquals(.2f, tall.y, .00001f)
+    }
     @Test fun oldAndLayeredBackupsRoundTrip() {
         listOf(Inventory(version = 1), layered()).forEach { original ->
             val bytes = java.io.ByteArrayOutputStream()

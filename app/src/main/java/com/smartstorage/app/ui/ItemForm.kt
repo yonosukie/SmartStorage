@@ -30,6 +30,10 @@ import androidx.core.net.toUri
     var notes by rememberSaveable { mutableStateOf(old?.notes ?: "") }
     var valuable by rememberSaveable { mutableStateOf(old?.valuable ?: false) }
     var photo by rememberSaveable { mutableStateOf(old?.photo) }
+    var originalPhoto by rememberSaveable { mutableStateOf(old?.photo) }
+    var cutoutPhoto by rememberSaveable { mutableStateOf<String?>(null) }
+    var photoStatus by remember { mutableStateOf("") }
+    var cutoutConfigured by remember { mutableStateOf(vm.repository.cutoutSettings.readKey().isNotBlank()) }
     var tags by rememberSaveable { mutableStateOf(old?.tags ?: emptyList()) }
     var quantity by rememberSaveable { mutableStateOf("1") }
     var price by rememberSaveable { mutableStateOf("") }
@@ -46,9 +50,22 @@ import androidx.core.net.toUri
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val busy by vm.busy.collectAsState()
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { vm.work { photo = vm.repository.importPhoto(it) } } }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> if (ok) cameraUri?.let { value -> vm.work { photo = vm.repository.importPhoto(value.toUri()) } } }
-    BackHandler { exit = true }
+    suspend fun cutout(name: String) {
+        photoStatus = "正在抠图，请稍候…"
+        try {
+            val result = vm.repository.removeBackground(name)
+            cutoutPhoto = result; photo = result; photoStatus = "抠图完成 · 透明 PNG"
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { photo = name; photoStatus = "${e.message ?: "抠图失败"}，已保留原图" }
+    }
+    fun importPhotoToForm(uri: android.net.Uri) { vm.work {
+        val source = vm.repository.importPhoto(uri)
+        originalPhoto = source; photo = source; cutoutPhoto = null; photoStatus = "原图已保存"
+        if (vm.repository.cutoutSettings.automatic) cutout(source)
+    } }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let(::importPhotoToForm) }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> if (ok) cameraUri?.let { importPhotoToForm(it.toUri()) } }
+    BackHandler { if (busy) vm.notify("图片正在处理，请稍候") else exit = true }
     fun save(target: Thing? = old) {
         try {
             require(name.isNotBlank() && unit.isNotBlank()) { "请填写物品名称和单位" }
@@ -67,7 +84,7 @@ import androidx.core.net.toUri
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (mode != "restock") {
-            if (photo != null) AsyncImage(File(vm.repository.photos, photo!!), "物品照片", Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Crop)
+            if (photo != null) AsyncImage(File(vm.repository.photos, photo!!), "物品照片", Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Fit)
             else EmptyState("给物品留张照片", "照片保存在本机，帮助你更快找到它。")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({
@@ -79,6 +96,12 @@ import androidx.core.net.toUri
                 }, Modifier.weight(1f), enabled = !busy) { Icon(Icons.Outlined.PhotoCamera, null); Text("拍照") }
                 OutlinedButton({ picker.launch("image/*") }, Modifier.weight(1f), enabled = !busy) { Text("相册") }
                 TextButton({ aiInfo = true }) { Text("AI 识别") }
+            }
+            CutoutSettingsPanel(vm) { cutoutConfigured = vm.repository.cutoutSettings.readKey().isNotBlank() }
+            if (photoStatus.isNotBlank()) Text(photoStatus, style = MaterialTheme.typography.bodySmall)
+            if (originalPhoto != null) Row {
+                TextButton({ vm.work { cutout(originalPhoto!!) } }, enabled = !busy && cutoutConfigured) { Text(if (cutoutPhoto == null) "抠图 / 重试" else "重新抠图") }
+                if (cutoutPhoto != null) TextButton({ photo = if (photo == cutoutPhoto) originalPhoto else cutoutPhoto }, enabled = !busy) { Text(if (photo == cutoutPhoto) "使用原图" else "使用抠图") }
             }
             FormSection("基本信息") {
             Field("物品名称 *", name, { name = it })
@@ -110,11 +133,11 @@ import androidx.core.net.toUri
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Button({ if (mode == "new" && s.items.any { it.name.trim().equals(name.trim(), true) }) duplicate = true else save() }, Modifier.fillMaxWidth(), enabled = !busy) { Text(if (mode == "edit") "保存修改" else "保存入库") }
-        TextButton({ exit = true }, Modifier.fillMaxWidth()) { Text("取消") }
+        TextButton({ exit = true }, Modifier.fillMaxWidth(), enabled = !busy) { Text("取消") }
         Spacer(Modifier.height(30.dp))
     }
     if (exit) Confirm("放弃本次编辑？", "本次尚未保存的表单内容将被放弃。", { exit = false }, onCancel)
-    if (aiInfo) AlertDialog({ aiInfo = false }, title = { Text("AI 识别待接入") }, text = { Text("本版优先提供本地管理。照片不会上传，请手动填写名称和分类；后续接入识别服务后可使用自动建议。") }, confirmButton = { TextButton({ aiInfo = false }) { Text("继续手动填写") } })
+    if (aiInfo) AlertDialog({ aiInfo = false }, title = { Text("AI 识别待接入") }, text = { Text("物品名称和分类识别尚未接入，请手动填写。自动抠图是独立的 remove.bg 功能，开启后会上传照片处理。") }, confirmButton = { TextButton({ aiInfo = false }) { Text("继续手动填写") } })
     if (duplicate) AlertDialog({ duplicate = false }, title = { Text("发现同名物品") }, text = {
         Column { Text("可以新建独立物品，也可以为已有物品补货：")
             s.items.filter { it.name.trim().equals(name.trim(), true) }.forEach { existing -> TextButton({ duplicate = false; save(existing) }) { Text("补货：${existing.name} · ${existing.unit}") } }

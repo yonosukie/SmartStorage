@@ -1,6 +1,8 @@
 # 家有好物 · SmartStorage
 
-Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文档](docs/Android-App设计文档.md)。AI 和云备份按当前开发约定仅预留接口，不上传照片或物品数据。
+Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文档](docs/Android-App设计文档.md)。AI 名称识别和云备份仍仅预留接口。v0.3.0 可选 remove.bg 自动抠图，启用时会发送用户所选照片，其余资料保存在本机。
+
+v0.3.0 功能与密钥配置见 [功能增强说明](docs/功能增强-v0.3.0.md)。
 
 ## 运行工程
 
@@ -21,7 +23,7 @@ Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文
 
 APK 输出：`app/build/outputs/apk/debug/app-debug.apk`。调试包用于开发验证，正式发布还需配置自己的签名和分发资料。
 
-本轮交付安装包：`artifacts/SmartStorage-0.2.0-debug.apk`。41 项自动化测试通过、Android Lint 无问题，详见[验证记录](docs/验证记录-v0.2.0.md)。尚未进行真机 UI 验收。上一版安装包保留。
+本轮交付安装包：`artifacts/SmartStorage-0.3.0-debug.apk`。50 项自动化测试通过、Android Lint 无问题，详见[验证记录](docs/验证记录-v0.3.0.md)。尚未进行真机 UI 验收。上一版安装包保留。
 
 v0.2.0 新增房子/房间/容器/物品卡片网格、容器分层管理、统一十格参考线吸附，以及 Material 3 日期与单选组件，详见[空间与组件优化说明](docs/空间与组件优化-v0.2.0.md)。
 

@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.smartstorage.app.ui.*
-import com.smartstorage.core.Place
+import com.smartstorage.core.*
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -33,6 +33,32 @@ class ComponentTest {
         compose.onNodeWithText("2026-09-22").performClick()
         compose.onNodeWithText("清除").performClick()
         compose.runOnIdle { assertEquals("", selected) }
+    }
+    @Test fun cascadingPickerCommitsOnlyAfterTraversingToLayer() {
+        val base = Inventory(places = Inventory().places + listOf(Place("h", kind = "HOUSE", name = "我的家"),
+            Place("r", "h", "ROOM", "客厅"), Place("c", "r", "CONTAINER", "柜子")))
+        val state = InventoryRules.setContainerLayers(base, "c", 2)
+        var result = "unchanged"
+        compose.setContent { StorageTheme { PlaceChoice(state, UNPLACED, { result = it }) } }
+        compose.onNodeWithText("位置").performClick()
+        compose.onNodeWithText("我的家").performClick()
+        compose.onNodeWithText("选择此位置").assertIsNotEnabled()
+        compose.onNodeWithText("客厅").performClick()
+        compose.onNodeWithText("柜子").performClick()
+        compose.onNodeWithText("第 2 层").performClick()
+        compose.runOnIdle { assertEquals("unchanged", result) }
+        compose.onNodeWithText("选择此位置").performClick()
+        compose.runOnIdle { assertEquals(state.layers("c")[1].id, result) }
+    }
+    @Test fun donutLegendSelectsGroupValue() {
+        compose.setContent { StorageTheme { DistributionChart("分类价值", listOf("食品" to 1000L, "日用品" to 3000L), currency = true) } }
+        compose.onNodeWithContentDescription("分类价值，2 个分组，合计 ¥40.00").assertExists()
+        compose.onNodeWithText("食品").performClick()
+        compose.onNodeWithText("¥10.00").assertExists()
+    }
+    @Test fun emptyChartDisplaysExplanation() {
+        compose.setContent { StorageTheme { DistributionChart("价值分布", emptyList(), currency = true) } }
+        compose.onNodeWithText("暂无已知价值数据，填写购入单价后显示图表。").assertExists()
     }
     @Test fun cardOpensContainerAndDisplaysLayerCount() {
         var opened = false

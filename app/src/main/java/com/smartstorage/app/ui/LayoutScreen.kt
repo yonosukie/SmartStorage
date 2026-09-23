@@ -78,6 +78,17 @@ import kotlin.math.roundToInt
             }
             boxes.firstOrNull { it.id == selected }?.let { box ->
                 Text("选中：${s.path(box.id)}")
+                FormSection("矩形尺寸", "宽和高可独立调整；每格为房间边长的 1/10") {
+                    val widthCells = (box.width * LayoutGrid.CELLS).roundToInt()
+                    val heightCells = (box.height * LayoutGrid.CELLS).roundToInt()
+                    Choice("宽度", widthCells.toString(), (1..LayoutGrid.CELLS).map { it.toString() to "$it 格" }) { value ->
+                        rememberChange(); boxes = boxes.map { if (it.id == box.id) LayoutGrid.resize(it, value.toInt(), heightCells) else it }
+                    }
+                    Choice("高度", heightCells.toString(), (1..LayoutGrid.CELLS).map { it.toString() to "$it 格" }) { value ->
+                        rememberChange(); boxes = boxes.map { if (it.id == box.id) LayoutGrid.resize(it, widthCells, value.toInt()) else it }
+                    }
+                    Text("当前：$widthCells × $heightCells 格", style = MaterialTheme.typography.labelLarge)
+                }
                 Row {
                     TextButton({ rememberChange(); boxes = boxes.map { if (it.id == box.id) LayoutGrid.snap(it.copy(width = it.width + .1f, height = it.height + .1f)) else it } }) { Text("放大") }
                     TextButton({ rememberChange(); boxes = boxes.map { if (it.id == box.id) LayoutGrid.snap(it.copy(width = it.width - .1f, height = it.height - .1f)) else it } }) { Text("缩小") }

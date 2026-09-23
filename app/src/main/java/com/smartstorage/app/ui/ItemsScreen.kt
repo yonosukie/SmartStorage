@@ -33,7 +33,7 @@ import java.io.File
     Card(onClick, Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) {
-                if (photo != null) AsyncImage(File(images, photo), thing.name, Modifier.fillMaxWidth().height(104.dp), contentScale = ContentScale.Crop)
+                if (photo != null) AsyncImage(File(images, photo), thing.name, Modifier.fillMaxWidth().height(104.dp), contentScale = if (photo.endsWith(".png", true)) ContentScale.Fit else ContentScale.Crop)
                 else Box(Modifier.fillMaxWidth().height(104.dp), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Inventory2, null, tint = MaterialTheme.colorScheme.primary) }
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {

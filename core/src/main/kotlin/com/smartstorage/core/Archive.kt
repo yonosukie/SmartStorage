@@ -35,7 +35,7 @@ object Archive {
         val entries = linkedMapOf("inventory.json" to storageJson.encodeToString(state).toByteArray(Charsets.UTF_8))
         var size = entries.values.sumOf { it.size.toLong() }
         state.items.mapNotNull { it.photo }.distinct().forEach { name ->
-            require(name.matches(Regex("[a-zA-Z0-9_-]+\\.jpg"))) { "图片路径无效" }
+            require(name.matches(Regex("[a-zA-Z0-9_-]+\\.(jpg|png)"))) { "图片路径无效" }
             val bytes = photos(name); size += bytes.size
             require(size <= MAX_BYTES) { "备份超过当前版本 128 MB 限制" }
             entries["photos/$name"] = bytes
@@ -68,7 +68,7 @@ object Archive {
             while (true) {
                 val entry = zip.nextEntry ?: break
                 require(entries.size < 20_000 && !entry.isDirectory && entry.name !in entries) { "备份结构无效" }
-                require(entry.name == "inventory.json" || entry.name == "manifest.json" || entry.name.matches(Regex("photos/[a-zA-Z0-9_-]+\\.jpg"))) { "备份包含非法路径" }
+                require(entry.name == "inventory.json" || entry.name == "manifest.json" || entry.name.matches(Regex("photos/[a-zA-Z0-9_-]+\\.(jpg|png)"))) { "备份包含非法路径" }
                 val bytes = zip.readLimited((MAX_BYTES - size).toInt()); size += bytes.size; entries[entry.name] = bytes
             }
         }

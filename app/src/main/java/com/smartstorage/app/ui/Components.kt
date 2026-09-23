@@ -133,9 +133,40 @@ val LocalToday = compositionLocalOf { java.time.LocalDate.now() }
     }
 }
 @Composable fun PlaceChoice(s: Inventory, selected: String, onSelect: (String) -> Unit, includeHouses: Boolean = false, includeAll: Boolean = false) {
-    val options = (if (includeAll) listOf("" to "全部位置") else emptyList()) + s.places.filter { !it.archived && (includeHouses || it.kind != "HOUSE") }
-        .sortedBy { s.path(it.id) }.map { it.id to s.path(it.id) }
-    Choice("位置", selected, options, onSelect)
+    var open by remember { mutableStateOf(false) }
+    PickerField("位置", if (selected.isBlank()) "全部位置" else s.path(selected), { open = true })
+    if (open) {
+        var cursor by remember { mutableStateOf(s.places.firstOrNull { it.id == selected && !it.archived && it.kind != "SYSTEM" }?.id) }
+        val current = s.places.firstOrNull { it.id == cursor }
+        val children = s.places.filter { !it.archived && it.parentId == cursor }
+            .sortedWith(compareBy<Place> { it.layerNumber ?: 0 }.thenBy { it.order }.thenBy { it.name })
+        AlertDialog({ open = false }, title = { Text("选择存放位置") }, text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(if (current == null) "全部空间" else s.path(current.id), style = MaterialTheme.typography.titleSmall)
+                if (current != null) TextButton({ cursor = current.parentId }) { Text("返回上一级") }
+                Text("逐级打开空间，再确认存放位置", style = MaterialTheme.typography.bodySmall)
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(children, key = { it.id }) { place ->
+                        OutlinedCard({ cursor = place.id }, Modifier.fillMaxWidth()) {
+                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(placeIcon(place), null, Modifier.size(24.dp))
+                                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                    Text(place.name); Text(if (place.kind == "SYSTEM") "待归位" else placeType(place.kind), style = MaterialTheme.typography.labelSmall)
+                                }
+                                Icon(Icons.Outlined.ChevronRight, null)
+                            }
+                        }
+                    }
+                    if (children.isEmpty()) item { Text("已到达最末级，可选择此位置。") }
+                }
+            }
+        }, confirmButton = {
+            TextButton({ onSelect(current?.id ?: ""); open = false },
+                enabled = if (current == null) includeAll else !current.archived && (includeHouses || current.kind != "HOUSE")) {
+                Text(if (current == null) "选择全部位置" else "选择此位置")
+            }
+        }, dismissButton = { TextButton({ open = false }) { Text("取消") } })
+    }
 }
 @Composable fun Chips(options: List<String>, selected: String, onSelect: (String) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

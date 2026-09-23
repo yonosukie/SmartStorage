@@ -15,6 +15,14 @@ class ArchiveTest {
         val restored = Archive.read(out.toByteArray().inputStream())
         assertEquals(original, restored.state); assertArrayEquals(byteArrayOf(1,2,3), restored.photos[photo])
     }
+    @Test fun pngCutoutSurvivesBackupWithoutReencoding() {
+        val s = sample().let { it.copy(items = it.items.map { item -> item.copy(photo = "transparent.png") }) }
+        val pixels = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
+        val out = ByteArrayOutputStream(); Archive.write(s, { pixels }, out)
+        val restored = Archive.read(out.toByteArray().inputStream())
+        assertEquals("transparent.png", restored.state.items.single().photo)
+        assertArrayEquals(pixels, restored.photos["transparent.png"])
+    }
     @Test fun encryptedBackupRequiresCorrectPassword() {
         val bytes = archive("correct")
         assertEquals(1, Archive.read(bytes.inputStream(), "correct".toCharArray()).state.items.size)
