@@ -1,6 +1,10 @@
 # 家有好物 · SmartStorage
 
-Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文档](docs/Android-App设计文档.md)。AI 名称识别和云备份仍仅预留接口。v0.3.0 可选 remove.bg 自动抠图，启用时会发送用户所选照片，其余资料保存在本机。
+Kotlin / Jetpack Compose Android 本地收纳应用。产品范围见 [设计文档](docs/Android-App设计文档.md)。v0.4.0 接入 OpenRouter 免费视觉模型，支持照片识别和自动填表；云备份仍预留接口。AI 识别会上传所选照片及分类选项，remove.bg 抠图会上传所选照片，其他库存资料保存在本机。
+
+本轮安装包：`artifacts/SmartStorage-0.4.0-debug.apk`。58 项测试通过，Lint 无问题；真实 API 与真机验收待配置 Key 后进行。
+
+OpenRouter 配置、免费模型限制和验收步骤见 [AI 识别说明](docs/OpenRouter-AI识别.md)。
 
 v0.3.0 功能与密钥配置见 [功能增强说明](docs/功能增强-v0.3.0.md)。
 
@@ -23,7 +27,7 @@ v0.3.0 功能与密钥配置见 [功能增强说明](docs/功能增强-v0.3.0.md
 
 APK 输出：`app/build/outputs/apk/debug/app-debug.apk`。调试包用于开发验证，正式发布还需配置自己的签名和分发资料。
 
-本轮交付安装包：`artifacts/SmartStorage-0.3.0-debug.apk`。50 项自动化测试通过、Android Lint 无问题，详见[验证记录](docs/验证记录-v0.3.0.md)。尚未进行真机 UI 验收。上一版安装包保留。
+上一版交付安装包：`artifacts/SmartStorage-0.3.0-debug.apk`。50 项自动化测试通过、Android Lint 无问题，详见[验证记录](docs/验证记录-v0.3.0.md)。尚未进行真机 UI 验收。上一版安装包保留。
 
 v0.2.0 新增房子/房间/容器/物品卡片网格、容器分层管理、统一十格参考线吸附，以及 Material 3 日期与单选组件，详见[空间与组件优化说明](docs/空间与组件优化-v0.2.0.md)。
 

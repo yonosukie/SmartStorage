@@ -11,9 +11,9 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class CutoutSettings(context: Context) {
-    private val prefs = context.getSharedPreferences("cutout-private", Context.MODE_PRIVATE)
-    private val alias = "smartstorage-removebg"
+class CutoutSettings(context: Context, preferencesName: String = "cutout-private", private val alias: String = "smartstorage-removebg") {
+    private val prefs = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
+
     private fun secret(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }

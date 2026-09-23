@@ -21,6 +21,8 @@ import com.smartstorage.app.StorageViewModel
 import com.smartstorage.core.*
 import java.io.File
 import androidx.core.net.toUri
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable fun ItemForm(s: Inventory, vm: StorageViewModel, itemId: String?, mode: String, onDone: (String) -> Unit, onCancel: () -> Unit) {
     val old = s.items.firstOrNull { it.id == itemId }
@@ -43,13 +45,62 @@ import androidx.core.net.toUri
     var error by remember { mutableStateOf<String?>(null) }
     var exit by remember { mutableStateOf(false) }
     var duplicate by remember { mutableStateOf(false) }
-    var aiInfo by remember { mutableStateOf(false) }
+    var recognizing by remember { mutableStateOf(false) }
+    var recognitionStatus by remember { mutableStateOf("") }
+    var candidates by remember { mutableStateOf(emptyList<RecognizedItem>()) }
+    var touched by rememberSaveable { mutableStateOf(if (old == null) emptyList<String>() else listOf("category", "unit")) }
+    var undoRecognition by remember { mutableStateOf<Pair<RecognitionDraft, RecognitionDraft>?>(null) }
+    val recognitionScope = rememberCoroutineScope()
+    val currentInventory by rememberUpdatedState(s)
+    fun draft() = RecognitionDraft(name, category, unit, notes, tags)
+    fun setDraft(value: RecognitionDraft) {
+        name = value.name; category = value.category; unit = value.unit; notes = value.notes; tags = value.tags
+    }
+    fun undoAi() {
+        undoRecognition?.let { (before, applied) -> setDraft(draft().undo(before, applied, touched.toSet())) }
+        undoRecognition = null
+        recognitionStatus = "已撤销自动填写，保留手动修改"
+    }
+    fun applyRecognition(item: RecognizedItem) {
+        undoAi()
+        val before = draft()
+        val after = before.fill(item, currentInventory.labels, touched.toSet())
+        setDraft(after)
+        undoRecognition = if (before != after) before to after else null
+        candidates = emptyList()
+        recognitionStatus = if (before == after) "已识别为 ${item.name}；已有或手动修改的字段保持不变" else "AI 已填写 · 请核对后保存，手动填写的内容已保留"
+    }
+    fun recognize(source: String) {
+        if (recognizing) return
+        if (vm.repository.recognitionSettings.readKey().isBlank()) {
+            recognitionStatus = "请先在下方配置 OpenRouter API Key"
+            return
+        }
+        candidates = emptyList()
+        recognizing = true
+        recognitionStatus = "正在识别物品…"
+        recognitionScope.launch {
+            try {
+                val result = vm.repository.recognizePhoto(source, categories + currentInventory.items.map { it.category })
+                if (originalPhoto == source) {
+                    when (result.size) {
+                        0 -> recognitionStatus = "未识别到清晰物品，请重新拍照或手动填写"
+                        1 -> applyRecognition(result.single())
+                        else -> { candidates = result; recognitionStatus = "识别到多种物品，请选择本次录入的物品" }
+                    }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { recognitionStatus = "${e.message ?: "识别失败"}；可继续手动填写" }
+            finally { recognizing = false }
+        }
+    }
     var newTag by remember { mutableStateOf("") }
     val operationId = rememberSaveable { newId() }
     val newItemId = rememberSaveable { newId() }
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val busy by vm.busy.collectAsState()
+    val working by vm.busy.collectAsState()
+    val busy = working || recognizing
     suspend fun cutout(name: String) {
         photoStatus = "正在抠图，请稍候…"
         try {
@@ -60,7 +111,11 @@ import androidx.core.net.toUri
     }
     fun importPhotoToForm(uri: android.net.Uri) { vm.work {
         val source = vm.repository.importPhoto(uri)
+        undoAi()
+        candidates = emptyList()
+        recognitionStatus = ""
         originalPhoto = source; photo = source; cutoutPhoto = null; photoStatus = "原图已保存"
+        if (vm.repository.recognitionSettings.automatic) recognize(source)
         if (vm.repository.cutoutSettings.automatic) cutout(source)
     } }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let(::importPhotoToForm) }
@@ -95,8 +150,12 @@ import androidx.core.net.toUri
                     }.onFailure { vm.notify("无法启动相机，可以从相册选择") }
                 }, Modifier.weight(1f), enabled = !busy) { Icon(Icons.Outlined.PhotoCamera, null); Text("拍照") }
                 OutlinedButton({ picker.launch("image/*") }, Modifier.weight(1f), enabled = !busy) { Text("相册") }
-                TextButton({ aiInfo = true }) { Text("AI 识别") }
+                TextButton({ originalPhoto?.let(::recognize) }, enabled = !busy && originalPhoto != null) { Text("AI 识别") }
             }
+            RecognitionSettingsPanel(vm, recognizing)
+            if (recognitionStatus.isNotBlank()) Text(recognitionStatus, style = MaterialTheme.typography.bodySmall)
+            if (recognizing) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (undoRecognition != null) TextButton({ undoAi() }, enabled = !busy) { Text("撤销 AI 填写") }
             CutoutSettingsPanel(vm) { cutoutConfigured = vm.repository.cutoutSettings.readKey().isNotBlank() }
             if (photoStatus.isNotBlank()) Text(photoStatus, style = MaterialTheme.typography.bodySmall)
             if (originalPhoto != null) Row {
@@ -104,9 +163,9 @@ import androidx.core.net.toUri
                 if (cutoutPhoto != null) TextButton({ photo = if (photo == cutoutPhoto) originalPhoto else cutoutPhoto }, enabled = !busy) { Text(if (photo == cutoutPhoto) "使用原图" else "使用抠图") }
             }
             FormSection("基本信息") {
-            Field("物品名称 *", name, { name = it })
-            EditableChoice("分类", category, categories + s.items.map { it.category }) { category = it }
-            EditableChoice("计量单位", unit, listOf("件", "个", "盒", "瓶", "包", "袋", "支", "套") + s.items.map { it.unit }) { unit = it }
+            Field("物品名称 *", name, { name = it; touched = (touched + "name").distinct() })
+            EditableChoice("分类", category, categories + s.items.map { it.category }) { category = it; touched = (touched + "category").distinct() }
+            EditableChoice("计量单位", unit, listOf("件", "个", "盒", "瓶", "包", "袋", "支", "套") + s.items.map { it.unit }) { unit = it; touched = (touched + "unit").distinct() }
             }
         } else SectionTitle(old?.name ?: "补充库存", "本次补货单独记录购买日期、单价和保质期。")
         if (mode != "edit") {
@@ -121,14 +180,14 @@ import androidx.core.net.toUri
         if (mode != "restock") {
             FormSection("标签与备注", "一个物品可以有多个标签") {
             s.labels.forEach { tag -> Row {
-                Checkbox(tag.id in tags, { checked -> tags = if (checked) tags + tag.id else tags - tag.id }); Text(tag.name, Modifier.padding(top = 12.dp))
+                Checkbox(tag.id in tags, { checked -> tags = if (checked) tags + tag.id else tags - tag.id; touched = (touched + "tags").distinct() }); Text(tag.name, Modifier.padding(top = 12.dp))
             } }
             Row { Field("新标签", newTag, { newTag = it }, Modifier.weight(1f)); TextButton({
                 val tag = Label(name = newTag.trim())
-                vm.update({ tags = tags + tag.id; newTag = "" }) { it.copy(labels = it.labels + tag) }
+                vm.update({ tags = tags + tag.id; newTag = ""; touched = (touched + "tags").distinct() }) { it.copy(labels = it.labels + tag) }
             }, enabled = newTag.isNotBlank() && !busy) { Text("添加") } }
             Row { Checkbox(valuable, { valuable = it }); Text("标记为贵重物品", Modifier.padding(top = 12.dp)) }
-            Field("备注", notes, { notes = it }, singleLine = false)
+            Field("备注", notes, { notes = it; touched = (touched + "notes").distinct() }, singleLine = false)
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -137,7 +196,14 @@ import androidx.core.net.toUri
         Spacer(Modifier.height(30.dp))
     }
     if (exit) Confirm("放弃本次编辑？", "本次尚未保存的表单内容将被放弃。", { exit = false }, onCancel)
-    if (aiInfo) AlertDialog({ aiInfo = false }, title = { Text("AI 识别待接入") }, text = { Text("物品名称和分类识别尚未接入，请手动填写。自动抠图是独立的 remove.bg 功能，开启后会上传照片处理。") }, confirmButton = { TextButton({ aiInfo = false }) { Text("继续手动填写") } })
+    if (candidates.isNotEmpty()) AlertDialog(
+        onDismissRequest = { candidates = emptyList(); recognitionStatus = "已取消选择，可继续手动填写" },
+        title = { Text("选择本次录入的物品") },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+            candidates.forEach { item -> TextButton({ applyRecognition(item) }) { Text("${item.name} · ${item.category}") } }
+        } },
+        confirmButton = { TextButton({ candidates = emptyList(); recognitionStatus = "已取消选择，可继续手动填写" }) { Text("取消") } }
+    )
     if (duplicate) AlertDialog({ duplicate = false }, title = { Text("发现同名物品") }, text = {
         Column { Text("可以新建独立物品，也可以为已有物品补货：")
             s.items.filter { it.name.trim().equals(name.trim(), true) }.forEach { existing -> TextButton({ duplicate = false; save(existing) }) { Text("补货：${existing.name} · ${existing.unit}") } }

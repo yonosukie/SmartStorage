@@ -26,6 +26,11 @@ class InventoryRepository(private val context: Context) {
     val state = mutableState.asStateFlow()
     val photos = File(context.filesDir, "photos").apply { mkdirs() }
     val cutoutSettings = CutoutSettings(context)
+    val recognitionSettings = RecognitionSettings(context)
+    suspend fun recognizePhoto(name: String, categories: List<String>): List<RecognizedItem> {
+        require(name.matches(Regex("[a-zA-Z0-9_-]+\\.(jpg|png)"))) { "图片路径无效" }
+        return OpenRouterClient().recognize(File(photos, name), recognitionSettings.readKey(), recognitionSettings.model, categories)
+    }
     val safetyBackup = File(context.filesDir, "restore-safety.ssb")
     fun close() = db.close()
     suspend fun load() = withContext(Dispatchers.IO) { mutex.withLock {
