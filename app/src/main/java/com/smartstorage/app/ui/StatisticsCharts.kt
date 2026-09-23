@@ -1,5 +1,9 @@
 package com.smartstorage.app.ui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -69,6 +73,86 @@ private val chartColors = listOf(Color(0xFF287B65), Color(0xFFCC934E), Color(0xF
                 TextButton({ onDetails(selected!!) }, Modifier.align(Alignment.End)) { Text("查看选中明细") }
             }
             Text(if (donut) "点击图例查看分组数值" else "横条按分组最大值缩放；百分比按图中分组总和计算", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+
+@Composable fun QuantityColumns(values: List<Pair<String, Long>>, onDetails: (String) -> Unit) {
+    val entries = values.filter { it.second > 0 }.sortedByDescending { it.second }
+    FormSection("分类库存数量", "看看哪些物品囤得多；点击柱形查看物品。") {
+        if (entries.isEmpty()) Text("暂无统计数据。") else {
+            Text("库存合计 ${entries.sumOf { it.second }}", style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                entries.forEachIndexed { index, (name, value) ->
+                    Column(Modifier.width(72.dp).clickable { onDetails(name) }
+                        .semantics { contentDescription = "$name，库存数量 $value，查看物品" }, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.height(164.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(value.toString(), style = MaterialTheme.typography.labelMedium)
+                                Spacer(Modifier.height(6.dp))
+                                Box(Modifier.width(36.dp).height((128f * value.toFloat() / entries.maxOf { it.second }).coerceAtLeast(3f).dp)
+                                    .background(chartColors[index % chartColors.size], RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(name, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            if (entries.size > 3) Text("左右滑动查看全部分类", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+data class RoomChartEntry(val id: String, val name: String, val quantity: Long)
+
+@Composable fun RoomBars(values: List<RoomChartEntry>, onDetails: (String) -> Unit) {
+    val entries = values.filter { it.quantity > 0 }.sortedByDescending { it.quantity }
+    FormSection("房间收纳分布", "按库存数量比较；点击横条查看该位置的物品。") {
+        if (entries.isEmpty()) Text("暂无统计数据。") else entries.forEachIndexed { index, entry ->
+            Column(Modifier.fillMaxWidth().clickable { onDetails(entry.id) }.padding(vertical = 10.dp)
+                .semantics { contentDescription = "${entry.name}，库存数量 ${entry.quantity}，查看物品" }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(entry.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(entry.quantity.toString(), Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleSmall)
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(progress = { entry.quantity.toFloat() / entries.maxOf { it.quantity } },
+                    modifier = Modifier.fillMaxWidth().height(12.dp), color = chartColors[index % chartColors.size])
+            }
+        }
+    }
+}
+
+@Composable fun ExpiryStatusChart(counts: Map<String, Int>, onDetails: (String) -> Unit) {
+    val labels = listOf("已过期", "即将到期", "有效期内", "未设置")
+    val colors = listOf(Color(0xFFB44F52), Color(0xFFAC751F), Color(0xFF287B65), Color(0xFF7D858A))
+    val total = labels.sumOf { counts[it] ?: 0 }
+    FormSection("到期提醒", "按在库批次统计，同一批次分放多处仅计一次。") {
+        if (total == 0) Text("暂无在库物品，录入后可查看到期情况。") else {
+            Row(Modifier.fillMaxWidth().height(24.dp)) {
+                labels.forEachIndexed { index, label ->
+                    val count = counts[label] ?: 0
+                    if (count > 0) Box(Modifier.weight(count.toFloat()).fillMaxHeight().background(colors[index])
+                        .clickable { onDetails(label) }.semantics { contentDescription = "$label，$count 个批次" })
+                }
+            }
+            labels.chunked(2).forEach { pair ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pair.forEach { label ->
+                        val count = counts[label] ?: 0
+                        val color = colors[labels.indexOf(label)]
+                        Surface(Modifier.weight(1f), color = color.copy(alpha = .08f), shape = RoundedCornerShape(12.dp)) {
+                            Column(Modifier.clickable(enabled = count > 0) { onDetails(label) }.padding(12.dp)) {
+                                Text(if (label == "未设置") "未设置有效期" else label, color = color, style = MaterialTheme.typography.labelLarge)
+                                Text("$count 个批次", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                }
+            }
+            Text("点击状态查看清单；有效期内不含即将到期。", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

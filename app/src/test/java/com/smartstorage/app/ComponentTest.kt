@@ -84,4 +84,24 @@ class ComponentTest {
         compose.onNodeWithText("衣柜").performClick()
         compose.runOnIdle { assertTrue(opened) }
     }
+    @Test fun quantityColumnOpensItsCategory() {
+        var chosen = ""
+        compose.setContent { StorageTheme { QuantityColumns(listOf("食品" to 8L, "衣物" to 2L)) { chosen = it } } }
+        compose.onNodeWithContentDescription("食品，库存数量 8，查看物品").performClick()
+        compose.runOnIdle { assertEquals("食品", chosen) }
+    }
+    @Test fun roomBarsKeepDistinctLocationIds() {
+        var chosen = ""
+        compose.setContent { StorageTheme { RoomBars(listOf(RoomChartEntry("r1", "家一 / 客厅", 8), RoomChartEntry("r2", "家二 / 客厅", 2))) { chosen = it } } }
+        compose.onNodeWithText("家二 / 客厅").performClick()
+        compose.runOnIdle { assertEquals("r2", chosen) }
+    }
+    @Test fun expiryStatusOpensMatchingFilter() {
+        var chosen = ""
+        compose.setContent { StorageTheme { ExpiryStatusChart(mapOf("已过期" to 2, "即将到期" to 1)) { chosen = it } } }
+        compose.onNodeWithText("即将到期").performClick()
+        compose.runOnIdle { assertEquals("即将到期", chosen) }
+        compose.onNodeWithText("未设置有效期").performClick()
+        compose.runOnIdle { assertEquals("即将到期", chosen) }
+    }
 }
