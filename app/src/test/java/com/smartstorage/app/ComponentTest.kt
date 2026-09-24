@@ -2,6 +2,7 @@ package com.smartstorage.app
 
 import android.app.Application
 import androidx.compose.ui.test.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.smartstorage.app.ui.*
 import com.smartstorage.core.*
@@ -17,6 +18,53 @@ import org.robolectric.annotation.Config
 class ComponentTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun quantityStepperPreventsUnderflowAndOverflowAndAllowsManualEntry() {
+        compose.setContent {
+            var count by remember { mutableStateOf("1") }
+            StorageTheme { QuantityField(count) { count = it } }
+        }
+        compose.onNodeWithContentDescription("减少数量").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("增加数量").performClick()
+        compose.onNodeWithText("2").assertExists()
+        compose.onNodeWithContentDescription("减少数量").performClick()
+        compose.onNodeWithText("1").assertExists()
+        compose.onNode(hasSetTextAction()).performTextReplacement(Int.MAX_VALUE.toString())
+        compose.onNodeWithContentDescription("增加数量").assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performTextReplacement("")
+        compose.onNodeWithContentDescription("增加数量").assertIsNotEnabled()
+        compose.onNode(hasSetTextAction()).performTextReplacement("12")
+        compose.onNodeWithContentDescription("减少数量").performClick()
+        compose.onNodeWithText("11").assertExists()
+    }
+
+    @Test fun optionalFieldsKeepDraftWhenCollapsedAndReopened() {
+        compose.setContent {
+            var price by remember { mutableStateOf("") }
+            StorageTheme { CollapsibleSection("更多信息") { Field("价格", price, { price = it }) } }
+        }
+        compose.onNodeWithText("价格").assertDoesNotExist()
+        compose.onNodeWithText("更多信息").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("129.50")
+        compose.onNodeWithText("更多信息").performClick()
+        compose.onNodeWithText("价格").assertDoesNotExist()
+        compose.onNodeWithText("更多信息").performClick()
+        compose.onNodeWithText("129.50").assertExists()
+    }
+
+    @Test fun horizontalCardAggregatesLocationsAndOpensItem() {
+        val base = Inventory(places = Inventory().places + listOf(
+            Place("house", kind = "HOUSE", name = "家"),
+            Place("room", "house", "ROOM", "书房"),
+            Place("drawer", "room", "CONTAINER", "抽屉")))
+        val added = InventoryRules.add(base, Thing("i", "耳机", category = "数码家电"), Batch("b", "i"), 3, UNPLACED, "add")
+        val state = InventoryRules.change(added, added.balances.single().id, 1, "移动", "drawer", "move")
+        var opened = false
+        compose.setContent { StorageTheme { ItemCard(state, state.rows(), { opened = true }) } }
+        compose.onNodeWithText("数量 3").assertExists()
+        compose.onNodeWithText("家 › 书房 › 抽屉", substring = true).assertExists()
+        compose.onNodeWithText("耳机").performClick()
+        compose.runOnIdle { assertTrue(opened) }
+    }
     @Test fun selectorCommitsSelectedLayer() {
         var selected = ""
         compose.setContent { StorageTheme { Choice("位置", "1", listOf("1" to "第 1 层", "2" to "第 2 层")) { selected = it } } }

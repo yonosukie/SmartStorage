@@ -28,14 +28,34 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.Instant
 
-val Green = Color(0xFF236B50)
+val Green = Color(0xFF176B5B)
 val LocalToday = compositionLocalOf { java.time.LocalDate.now() }
 @Composable fun StorageTheme(content: @Composable () -> Unit) {
-    val colors = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF92D4AD), secondary = Color(0xFFE3C18E))
-        else lightColorScheme(primary = Green, onPrimary = Color.White, primaryContainer = Color(0xFFDFEEE2),
-            secondary = Color(0xFF8B6938), secondaryContainer = Color(0xFFF0E6D4), background = Color(0xFFF8F8F2),
-            surface = Color(0xFFF8F8F2), surfaceContainer = Color(0xFFF0F1E9), outlineVariant = Color(0xFFDCE3D9))
-    MaterialTheme(colorScheme = colors, shapes = Shapes(medium = RoundedCornerShape(18.dp), large = RoundedCornerShape(24.dp)), content = content)
+    val colors = if (isSystemInDarkTheme()) darkColorScheme(
+        primary = Color(0xFF8BD5C2), onPrimary = Color(0xFF00382D),
+        primaryContainer = Color(0xFF164E42), onPrimaryContainer = Color(0xFFB6F2E0),
+        secondary = Color(0xFFA7CFC3), background = Color(0xFF111715),
+        surface = Color(0xFF191F1C), surfaceContainerLow = Color(0xFF191F1C),
+        surfaceContainer = Color(0xFF242C28), onSurface = Color(0xFFE4EAE5),
+        onSurfaceVariant = Color(0xFFB5C4BC), outlineVariant = Color(0xFF36443D))
+    else lightColorScheme(
+        primary = Green, onPrimary = Color.White,
+        primaryContainer = Color(0xFFE5F2ED), onPrimaryContainer = Color(0xFF155344),
+        secondary = Color(0xFF526C62), secondaryContainer = Color(0xFFECF1ED),
+        background = Color(0xFFF7F8F6), surface = Color.White,
+        surfaceContainerLow = Color.White, surfaceContainer = Color(0xFFF0F3EF),
+        onBackground = Color(0xFF202A26), onSurface = Color(0xFF202A26),
+        onSurfaceVariant = Color(0xFF65736C), outline = Color(0xFF8B9890),
+        outlineVariant = Color(0xFFE2E8E1))
+    MaterialTheme(
+        colorScheme = colors,
+        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(16.dp),
+            large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(24.dp)),
+        typography = Typography(
+            headlineSmall = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
+            titleLarge = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
+            titleMedium = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)),
+        content = content)
 }
 @Composable fun SectionTitle(title: String, subtitle: String? = null) {
     Column(Modifier.padding(vertical = 8.dp)) {
@@ -125,9 +145,10 @@ val LocalToday = compositionLocalOf { java.time.LocalDate.now() }
 }
 
 @Composable fun FormSection(title: String, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionTitle(title, subtitle)
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             content()
         }
     }

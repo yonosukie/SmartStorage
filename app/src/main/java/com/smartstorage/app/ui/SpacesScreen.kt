@@ -122,7 +122,7 @@ fun placeIcon(place: Place): ImageVector = when {
                         else vm.notify("未选中可存放的位置，物品没有移动")
                         dragPosition = null; dragging = null
                     }, onDrag = { change, amount -> change.consume(); dragPosition = dragPosition?.plus(amount) })
-            }) { ItemCard(s, listOf(row), { openItem(row.item.id) }, vm.repository.photos) }
+            }) { ItemCard(s, listOf(row), { openItem(row.item.id) }, vm.repository.photos, compact = true) }
         }
         if (rows.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { EmptyState("这里还没有物品", "录入时选择这里，或从物品详情将已有物品移入。") }
     }

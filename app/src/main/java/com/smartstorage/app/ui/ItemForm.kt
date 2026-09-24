@@ -12,11 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
 import com.smartstorage.app.StorageViewModel
 import com.smartstorage.core.*
 import java.io.File
@@ -73,7 +72,7 @@ import kotlinx.coroutines.CancellationException
     fun recognize(source: String) {
         if (recognizing) return
         if (vm.repository.recognitionSettings.readKey().isBlank()) {
-            recognitionStatus = "请先在下方配置 OpenRouter API Key"
+            recognitionStatus = "请展开“图片处理设置”，配置 OpenRouter API Key"
             return
         }
         candidates = emptyList()
@@ -125,6 +124,7 @@ import kotlinx.coroutines.CancellationException
         try {
             require(name.isNotBlank()) { "请填写物品名称" }
             val count = quantity.toIntOrNull() ?: error("请输入整数数量")
+            require(mode == "edit" || count > 0) { "数量必须大于 0" }
             val item = if (target != null && mode != "edit") target else Thing(target?.id ?: newItemId,
                 name.trim(), category.trim().ifEmpty { "未分类" }, legacyUnit, tags, notes.trim(), valuable, photo,
                 target?.createdAt ?: System.currentTimeMillis(), target?.archived ?: false)
@@ -137,10 +137,19 @@ import kotlinx.coroutines.CancellationException
             }
         } catch (e: Exception) { error = e.message ?: "请检查填写内容" }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (mode != "restock") {
-            if (photo != null) AsyncImage(File(vm.repository.photos, photo!!), "物品照片", Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Fit)
-            else EmptyState("给物品留张照片", "照片保存在本机，帮助你更快找到它。")
+            if (photo != null) ItemPhoto(photo, vm.repository.photos, Modifier.fillMaxWidth().height(200.dp))
+            else OutlinedCard(onClick = { picker.launch("image/*") }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text("添加物品照片", style = MaterialTheme.typography.titleMedium)
+                    Text("拍照或从相册选择", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton({
                     runCatching {
@@ -152,11 +161,11 @@ import kotlinx.coroutines.CancellationException
                 OutlinedButton({ picker.launch("image/*") }, Modifier.weight(1f), enabled = !busy) { Text("相册") }
                 TextButton({ originalPhoto?.let(::recognize) }, enabled = !busy && originalPhoto != null) { Text("AI 识别") }
             }
-            RecognitionSettingsPanel(vm, recognizing)
+
             if (recognitionStatus.isNotBlank()) Text(recognitionStatus, style = MaterialTheme.typography.bodySmall)
             if (recognizing) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (undoRecognition != null) TextButton({ undoAi() }, enabled = !busy) { Text("撤销 AI 填写") }
-            CutoutSettingsPanel(vm) { cutoutConfigured = vm.repository.cutoutSettings.readKey().isNotBlank() }
+
             if (photoStatus.isNotBlank()) Text(photoStatus, style = MaterialTheme.typography.bodySmall)
             if (originalPhoto != null) Row {
                 TextButton({ vm.work { cutout(originalPhoto!!) } }, enabled = !busy && cutoutConfigured) { Text(if (cutoutPhoto == null) "抠图 / 重试" else "重新抠图") }
@@ -168,31 +177,54 @@ import kotlinx.coroutines.CancellationException
             }
         } else SectionTitle(old?.name ?: "补充库存", "本次补货单独记录购买日期、单价和保质期。")
         if (mode != "edit") {
-            FormSection("库存与存放", "可选择容器内的具体层") {
-            Field("数量 *", quantity, { quantity = it }, keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+            FormSection("存放信息") {
+
             PlaceChoice(s, location, { location = it })
-            Field("购入单价 / 元（可选）", price, { price = it })
-            DateField("购买日期（可选）", purchased, { purchased = it }, maxDate = expires)
-            DateField("到期日期（可选）", expires, { expires = it }, minDate = purchased)
+            QuantityField(quantity, { quantity = it })
+
             }
         }
         if (mode != "restock") {
-            FormSection("标签与备注", "一个物品可以有多个标签") {
-            s.labels.forEach { tag -> Row {
-                Checkbox(tag.id in tags, { checked -> tags = if (checked) tags + tag.id else tags - tag.id; touched = (touched + "tags").distinct() }); Text(tag.name, Modifier.padding(top = 12.dp))
-            } }
-            Row { Field("新标签", newTag, { newTag = it }, Modifier.weight(1f)); TextButton({
-                val tag = Label(name = newTag.trim())
-                vm.update({ tags = tags + tag.id; newTag = ""; touched = (touched + "tags").distinct() }) { it.copy(labels = it.labels + tag) }
-            }, enabled = newTag.isNotBlank() && !busy) { Text("添加") } }
-            Row { Checkbox(valuable, { valuable = it }); Text("标记为贵重物品", Modifier.padding(top = 12.dp)) }
-            Field("备注", notes, { notes = it; touched = (touched + "notes").distinct() }, singleLine = false)
+            FormSection("备注（选填）") {
+                Field("添加补充说明", notes, { notes = it; touched = (touched + "notes").distinct() }, singleLine = false)
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Button({ if (mode == "new" && s.items.any { it.name.trim().equals(name.trim(), true) }) duplicate = true else save() }, Modifier.fillMaxWidth(), enabled = !busy) { Text(if (mode == "edit") "保存修改" else "保存入库") }
-        TextButton({ exit = true }, Modifier.fillMaxWidth(), enabled = !busy) { Text("取消") }
-        Spacer(Modifier.height(30.dp))
+        CollapsibleSection("更多信息", if (mode == "edit") "标签与贵重物品" else "价格、日期与标签") {
+            if (mode != "edit") FormSection("购买与保质期") {
+                Field("购入单价 / 元（可选）", price, { price = it }, keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal)
+                DateField("购买日期（可选）", purchased, { purchased = it }, maxDate = expires)
+                DateField("到期日期（可选）", expires, { expires = it }, minDate = purchased)
+            }
+            if (mode != "restock") FormSection("标签与标记") {
+                s.labels.forEach { tag -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(tag.id in tags, { checked -> tags = if (checked) tags + tag.id else tags - tag.id; touched = (touched + "tags").distinct() })
+                    Text(tag.name, Modifier.weight(1f))
+                } }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Field("新标签", newTag, { newTag = it }, Modifier.weight(1f))
+                    TextButton({
+                        val tag = Label(name = newTag.trim())
+                        vm.update({ tags = tags + tag.id; newTag = ""; touched = (touched + "tags").distinct() }) { it.copy(labels = it.labels + tag) }
+                    }, enabled = newTag.isNotBlank() && !busy) { Text("添加") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(valuable, { valuable = it }); Text("标记为贵重物品", Modifier.weight(1f))
+                }
+            }
+        }
+        if (mode != "restock") CollapsibleSection("图片处理设置", "AI 识别与自动抠图") {
+            RecognitionSettingsPanel(vm, recognizing)
+            CutoutSettingsPanel(vm) { cutoutConfigured = vm.repository.cutoutSettings.readKey().isNotBlank() }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+    ActionFooter {
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        Button({ if (mode == "new" && s.items.any { it.name.trim().equals(name.trim(), true) }) duplicate = true else save() },
+            Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !busy, shape = MaterialTheme.shapes.medium) {
+            Text(when (mode) { "edit" -> "保存修改"; "restock" -> "确认补货"; else -> "保存物品" })
+        }
+    }
     }
     if (exit) Confirm("放弃本次编辑？", "本次尚未保存的表单内容将被放弃。", { exit = false }, onCancel)
     if (candidates.isNotEmpty()) AlertDialog(

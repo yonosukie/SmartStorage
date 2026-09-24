@@ -1,6 +1,9 @@
 package com.smartstorage.app.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -22,18 +25,50 @@ import java.time.ZoneId
     var type by remember { mutableStateOf("消耗") }
     var editBatch by remember { mutableStateOf<Batch?>(null) }
     val busy by vm.busy.collectAsState()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { SectionTitle(item.name, "${item.category}${if (item.valuable) " · 贵重物品" else ""}") }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Metric("${rows.sumOf { it.balance.quantity.toLong() }}", "当前库存", Modifier.weight(1f))
-            Metric("¥${money(rows.sumOf { it.value })}", "已知成本", Modifier.weight(1f))
-        } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onRestock, Modifier.weight(1f)) { Text("补货") }; OutlinedButton(onEdit, Modifier.weight(1f)) { Text("编辑资料") }
+    Column(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { ItemPhoto(item.photo, vm.repository.photos, Modifier.fillMaxWidth().height(240.dp)) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(item.name, style = MaterialTheme.typography.headlineSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CategoryBadge(item.category)
+                    if (item.valuable) CategoryBadge("贵重物品")
+                    if (item.archived) CategoryBadge("已归档")
+                }
+            }
         }
-            FilledTonalButton({ rows.firstOrNull { it.balance.quantity > 0 }?.let { selected = it; type = "消耗" } }, Modifier.fillMaxWidth(), enabled = rows.any { it.balance.quantity > 0 }) { Text("消耗一件 · 优先最早到期批次") }
-            if (item.tags.isNotEmpty()) Text("标签：" + s.labels.filter { it.id in item.tags }.joinToString("、") { it.name })
-            if (item.notes.isNotBlank()) Text(item.notes)
+        item {
+            FormSection("存放位置") {
+                val locations = rows.filter { it.balance.quantity > 0 }.groupBy { it.balance.placeId }
+                if (locations.isEmpty()) Text("暂无在库物品", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                locations.entries.forEachIndexed { index, (place, stocks) ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(s.path(place).replace(" / ", " › "), style = MaterialTheme.typography.bodyLarge)
+                            Text("数量 ${stocks.sumOf { it.balance.quantity.toLong() }}", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            FormSection("物品信息") {
+                DetailInfoRow("当前库存", rows.sumOf { it.balance.quantity.toLong() }.toString())
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                DetailInfoRow("已知成本", "¥${money(rows.sumOf { it.value })}")
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                DetailInfoRow("添加日期", Instant.ofEpochMilli(item.createdAt).atZone(ZoneId.systemDefault()).toLocalDate().toString())
+                if (item.tags.isNotEmpty()) DetailInfoRow("标签", s.labels.filter { it.id in item.tags }.joinToString("、") { it.name })
+            }
+        }
+        if (item.notes.isNotBlank()) item { FormSection("备注") { Text(item.notes, style = MaterialTheme.typography.bodyMedium) } }
+        item {
+            FilledTonalButton({ rows.firstOrNull { it.balance.quantity > 0 }?.let { selected = it; type = "消耗" } },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !busy && rows.any { it.balance.quantity > 0 }) { Text("消耗一件 · 优先最早到期批次") }
         }
         item { SectionTitle("库存批次与位置", "同一批次可以分散存放；到期不会自动扣减。") }
         items(rows, key = { it.balance.id }) { row -> OutlinedCard(Modifier.fillMaxWidth()) {
@@ -58,8 +93,22 @@ import java.time.ZoneId
         }
         if (rows.all { it.balance.quantity == 0 }) item { OutlinedButton({ vm.update { it.copy(items = it.items.map { entry -> if (entry.id == item.id) entry.copy(archived = !entry.archived) else entry }) } }) { Text(if(item.archived) "取消归档" else "归档物品") } }
     }
+    ActionFooter {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onRestock, Modifier.weight(1f).heightIn(min = 52.dp), enabled = !busy, shape = MaterialTheme.shapes.medium) { Text("补货") }
+            Button(onEdit, Modifier.weight(2f).heightIn(min = 52.dp), enabled = !busy, shape = MaterialTheme.shapes.medium) { Text("编辑物品") }
+        }
+    }
+    }
     selected?.let { row -> StockDialog(s, row, type, vm, { selected = null }) }
     editBatch?.let { batch -> BatchDialog(batch, vm, { editBatch = null }) }
+}
+
+@Composable private fun DetailInfoRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+        Text(label, Modifier.width(80.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 @Composable fun StockDialog(s: Inventory, row: StockRow, initialType: String, vm: StorageViewModel, dismiss: () -> Unit, initialTarget: String = UNPLACED) {

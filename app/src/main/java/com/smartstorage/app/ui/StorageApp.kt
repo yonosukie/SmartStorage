@@ -1,6 +1,7 @@
 package com.smartstorage.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -29,6 +30,7 @@ import com.smartstorage.core.*
     var spacePlaceId by rememberSaveable { mutableStateOf<String?>(null) }
     var formMode by rememberSaveable { mutableStateOf("new") }
     var filter by remember { mutableStateOf(Filter()) }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val snackbar = remember { SnackbarHostState() }
     var today by remember { mutableStateOf(java.time.LocalDate.now()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { today = java.time.LocalDate.now() }
@@ -39,18 +41,19 @@ import com.smartstorage.core.*
     val openItem: (String) -> Unit = { itemId = it; page = "detail" }
     val applyFilter: (Filter) -> Unit = { filter = it; tab = 2; page = "main" }
     CompositionLocalProvider(LocalToday provides today) { Scaffold(
-        topBar = { TopAppBar(title = { Text(when(page) { "form" -> when(formMode) { "edit" -> "编辑物品"; "restock" -> "补充库存"; else -> "记录新物品" }
-            "detail" -> "物品详情"; "stats" -> "家里的物品账本"; "templates" -> "收纳灵感"; "layout" -> "房间布局"; else -> listOf("家有好物", "我的空间", "全部物品", "我的")[tab] }) },
-            navigationIcon = { if (page != "main" && page != "form") IconButton({ back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") } }) },
-        bottomBar = { if (page == "main") NavigationBar {
-            listOf("首页" to Icons.Outlined.Home, "空间" to Icons.Outlined.GridView, "物品" to Icons.Outlined.Inventory2, "我的" to Icons.Outlined.PersonOutline).forEachIndexed { i, (title, icon) ->
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Text(when(page) { "form" -> when(formMode) { "edit" -> "编辑物品"; "restock" -> "补充库存"; else -> "新增物品" }
+            "detail" -> "物品详情"; "stats" -> "家里的物品账本"; "templates" -> "收纳灵感"; "layout" -> "房间布局"; else -> listOf("家有好物", "我的空间", "物品", "我的")[tab] }) },
+            navigationIcon = { if (page != "main") IconButton({ if (page == "form") backDispatcher?.onBackPressed() else back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") } }) },
+        bottomBar = { if (page == "main") NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            listOf(Triple(0, "首页", Icons.Outlined.Home), Triple(2, "物品", Icons.Outlined.Inventory2), Triple(1, "空间", Icons.Outlined.GridView), Triple(3, "我的", Icons.Outlined.PersonOutline)).forEach { (i, title, icon) ->
                 NavigationBarItem(tab == i, { tab = i }, icon = { Icon(icon, title) }, label = { Text(title) })
             }
         } },
-        floatingActionButton = { if (page == "main" && tab in listOf(0, 2) && state != null) ExtendedFloatingActionButton(
-            onClick = { formMode = "new"; itemId = null; page = "form" }, icon = { Icon(Icons.Outlined.Add, null) }, text = { Text("录入物品") }) },
+        floatingActionButton = { if (page == "main" && tab in listOf(0, 2) && state != null) FloatingActionButton(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
+            onClick = { formMode = "new"; itemId = null; page = "form" }) { Icon(Icons.Outlined.Add, "新增物品") } },
         snackbarHost = { SnackbarHost(snackbar) }
-    ) { padding -> Box(Modifier.fillMaxSize().padding(padding)) {
+    ) { padding -> Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
         val s = state
         if (s == null) Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (failure == null) { CircularProgressIndicator(); Text("正在打开你的收纳空间", Modifier.padding(16.dp)) }
